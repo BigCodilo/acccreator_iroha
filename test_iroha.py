@@ -11,14 +11,15 @@ class User:
     PrivKey = ""
 
 users = list()
+transactions = list()
 
 class TestIroha:
-    def __init__(self):
+    def __init__(self, user):
         # self.IROHA_HOST_ADDR = os.getenv('IROHA_HOST_ADDR', '192.168.88.202')
         self.IROHA_HOST_ADDR = os.getenv('IROHA_HOST_ADDR', 'localhost')
         self.IROHA_PORT = os.getenv('IROHA_PORT', '50051')
         self.admin_private_key = 'f101537e319568c765b2cc89698325604991dca57b9716b58016b253506cab70'
-        self.iroha = Iroha('admin@test')
+        self.iroha = Iroha(user.Name)
         self.net = IrohaGrpc('{}:{}'.format(self.IROHA_HOST_ADDR, self.IROHA_PORT))
         self.txAmount = 0
 
@@ -37,7 +38,8 @@ class TestIroha:
                           asset_id='coin#domain', description='sending', amount='0.01')
         ])
         IrohaCrypto.sign_transaction(tx, fromUser.PrivKey)
-        self.SendTx(tx)
+        transactions.append(tx)
+        # self.SendTx(tx)
 
 def ReadCSV():
     with open("accounts.csv", "r", newline="") as file:
@@ -54,8 +56,18 @@ def ReadCSV():
 
 def main():
     ReadCSV()
-    test = TestIroha()
-    test.SendToUser(users[76], users[77])
+
+    for fromUser in range(0, int(len(users)/2)):
+        for toUser in range(int(len(users)/2), len(users)):
+            test = TestIroha(users[fromUser])
+            test.SendToUser(users[fromUser], users[toUser])
+
+    sender = TestIroha(users[3])
+    for tx in transactions:
+        sender.SendTx(tx)
+    # for fromTx in range(1, int((len(transactions)-1)/2)):
+    #     for toTx in range(int((len(transactions)-1)/2), int((len(transactions))):
+
 
 if __name__ == "__main__":
     main()
