@@ -28,19 +28,23 @@ class AccCreator:
         self.admin_private_key = 'f101537e319568c765b2cc89698325604991dca57b9716b58016b253506cab70'
         self.iroha = Iroha('admin@test')
         self.net = IrohaGrpc('{}:{}'.format(self.IROHA_HOST_ADDR, self.IROHA_PORT))
-
-    def Starting(self, accsByThread):
+        self.txAmount = 0
         self.CreateDomainAsset()
         self.AddAdminCoin()
+
+    def Starting(self, accsByThread):
+        # self.CreateDomainAsset()
+        # self.AddAdminCoin()
         # start_time = time.time()
         self.CreateManyAccs(accsByThread)
-        # self.SendToAllAccs()
+        self.SendToAllAccs()
 
     def SendTxAndPrintstatus(self, transaction):
         hex_hash = binascii.hexlify(IrohaCrypto.hash(transaction))
         print('Transaction hash = {}, creator = {}'.format(
             hex_hash, transaction.payload.reduced_payload.creator_account_id))
         self.net.send_tx(transaction)
+        self.txAmount += 1
         # for status in self.net.tx_status_stream(transaction):
         #     print(status)
 
@@ -96,7 +100,7 @@ class AccCreator:
     def AddAdminCoin(self):
         tx = self.iroha.transaction([
             self.iroha.command('AddAssetQuantity',
-                          asset_id='coin#domain', amount='100000.00')
+                          asset_id='coin#domain', amount='1000000000.00')
         ])
         IrohaCrypto.sign_transaction(tx, self.admin_private_key)
         self.SendTxAndPrintstatus(tx)
@@ -110,7 +114,7 @@ class AccCreator:
     def SendToUser(self, user):
         tx = self.iroha.transaction([
             self.iroha.command('TransferAsset', src_account_id='admin@test', dest_account_id=user.Name,
-                          asset_id='coin#domain', description='init top up', amount='10.00')
+                          asset_id='coin#domain', description='init top up', amount='100.00')
         ])
         IrohaCrypto.sign_transaction(tx, self.admin_private_key)
         self.SendTxAndPrintstatus(tx)
@@ -138,6 +142,7 @@ def main():
     print("Accounts created: ", accountsAmount)
     print("Threads: ", threadsAmount)
     print("For: ", totalTime, " seconds")
+    print("Total transactions: ", accCreator.txAmount)
 
 
 
