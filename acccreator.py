@@ -3,8 +3,8 @@ import binascii
 import os
 import random
 import string
+import threading
 import time
-from threading import Thread
 
 from iroha import IrohaCrypto
 from iroha import Iroha, IrohaGrpc
@@ -17,6 +17,8 @@ class User:
     PrivKey = ""
 
 
+users = list()
+
 class AccCreator:
     def __init__(self):
 
@@ -26,22 +28,21 @@ class AccCreator:
         self.admin_private_key = 'f101537e319568c765b2cc89698325604991dca57b9716b58016b253506cab70'
         self.iroha = Iroha('admin@test')
         self.net = IrohaGrpc('{}:{}'.format(self.IROHA_HOST_ADDR, self.IROHA_PORT))
-        self.users = list()
 
-    def Starting(self):
+    def Starting(self, accsByThread):
         self.CreateDomainAsset()
         self.AddAdminCoin()
         # start_time = time.time()
-        self.CreateManyAccs(30)
-        self.SendToAllAccs()
+        self.CreateManyAccs(accsByThread)
+        # self.SendToAllAccs()
 
     def SendTxAndPrintstatus(self, transaction):
         hex_hash = binascii.hexlify(IrohaCrypto.hash(transaction))
         print('Transaction hash = {}, creator = {}'.format(
             hex_hash, transaction.payload.reduced_payload.creator_account_id))
         self.net.send_tx(transaction)
-        for status in self.net.tx_status_stream(transaction):
-            print(status)
+        # for status in self.net.tx_status_stream(transaction):
+        #     print(status)
 
 
     def CreateDomainAsset(self):
@@ -69,7 +70,7 @@ class AccCreator:
         ])
         IrohaCrypto.sign_transaction(tx, self.admin_private_key)
         self.SendTxAndPrintstatus(tx)
-        self.users.append(user)
+        users.append(user)
 
     def RandomName(self, stringLength=10):
         letters = string.ascii_lowercase
@@ -84,7 +85,7 @@ class AccCreator:
         outfile = open('accounts.csv','w')
         writer = csv.writer(outfile)
         writer.writerow(["NAME", "PUBLIC_KEY", "PRIVATE_KEY"])
-        for v in self.users:
+        for v in users:
             writer.writerow([v.Name, v.PubKey, v.PrivKey])
 
         outfile.close()
@@ -103,7 +104,7 @@ class AccCreator:
     #___________TRANSFERING COINS_________________________
 
     def SendToAllAccs(self):
-        for user in self.users:
+        for user in users:
             self.SendToUser(user)
 
     def SendToUser(self, user):
@@ -111,25 +112,34 @@ class AccCreator:
             self.iroha.command('TransferAsset', src_account_id='admin@test', dest_account_id=user.Name,
                           asset_id='coin#domain', description='init top up', amount='10.00')
         ])
-        print("sended")
         IrohaCrypto.sign_transaction(tx, self.admin_private_key)
         self.SendTxAndPrintstatus(tx)
 
 #STARTER____________________________________________________
 
 def main():
+    threadsAmount = input("Amount of threads: ")
+    accountsAmount = input("Amount of accounts: ")
+    accsByThread = int(accountsAmount)/int(threadsAmount)
+
+    startTime = time.time()
+
     accCreator = AccCreator()
-    accCreator.Starting()
+    for i in range(0, int(threadsAmount)):
+        threading.Thread(target=accCreator.Starting, args = [int(accsByThread)]).start()
+        # accCreator.Starting()
+
+    while threading.activeCount() > 1:
+        time.sleep(1);
+
+    totalTime = startTime - time.time()
+
+    accCreator.SaveAccsToCSV()
+    print("Accounts created: ", accountsAmount)
+    print("Threads: ", threadsAmount)
+    print("For: ", totalTime, " seconds")
 
 
-    # accCreator.CreateDomainAsset()
-    # accCreator.AddAdminCoin()
-    # start_time = time.time()
-    # accCreator.CreateManyAccs(int(input("amount of accounts: ")))
-    # accCreator.SendToAllAccs()
-    # print("--- %s seconds ---" % (time.time() - start_time))
-    # accCreator.SaveAccsToCSV()
-    # print("done")
 
 
 if __name__ == "__main__":
